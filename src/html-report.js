@@ -49,19 +49,28 @@ export function htmlReport(data, opts = {}) {
   // NOTE. Nested groups are not checked!
   let checkFailures = 0
   let checkPasses = 0
-  if (data.root_group.checks) {
-    let { passes, fails } = countChecks(data.root_group.checks)
-    checkFailures += fails
-    checkPasses += passes
+  // if (data.root_group.checks) {
+  //   let { passes, fails } = countChecks(data.root_group.checks)
+  //   checkFailures += fails
+  //   checkPasses += passes
+  // }
+
+  // for (let group of data.root_group.groups) {
+  //   if (group.checks) {
+  //     let { passes, fails } = countChecks(group.checks)
+  //     checkFailures += fails
+  //     checkPasses += passes
+  //   }
+  // }
+
+  let checks = []
+  for (const group of data.root_group.groups) {
+    checks = getChecks(group)
   }
 
-  for (let group of data.root_group.groups) {
-    if (group.checks) {
-      let { passes, fails } = countChecks(group.checks)
-      checkFailures += fails
-      checkPasses += passes
-    }
-  }
+  let { passes, fails } = countChecks(checks)
+  checkFailures += fails
+  checkPasses += passes
 
   const standardMetrics = [
     'grpc_req_duration',
@@ -103,6 +112,7 @@ export function htmlReport(data, opts = {}) {
     checkFailures,
     checkPasses,
     version,
+    checks,
   })
 
   // Return HTML string needs wrapping in a handleSummary result object
@@ -121,4 +131,30 @@ function countChecks(checks) {
     fails += parseInt(check.fails)
   }
   return { passes, fails }
+}
+
+function getChecks(data) {
+  let checks = []
+  if (data.checks.length != 0) {
+    for (const check in data.checks) {
+      const n = {
+        passes: check.passes,
+        fails: check.fails,
+        name: 'checking response code was 200',
+        path: '::StoreSearch Functional Tests::Stores Boudary Functional Tests::PostStoresSearchByBoundary::checking response code was 200',
+        id: '8e31f266c828fb500d80c6edaff4fe2a',
+        paths: parsePath(data.checks[check].path),
+      }
+      checks.push(n)
+    }
+  } else {
+    for (const group of data.groups) {
+      checks = checks.concat(getChecks(group))
+    }
+  }
+  return checks
+}
+
+function parsePath(data) {
+  return data.substring(2).split('::')
 }
