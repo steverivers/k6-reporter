@@ -7,8 +7,18 @@
 import ejs from '../node_modules/ejs/ejs.min.js'
 import template from './template.ejs'
 
-const version = '2.3.0'
+const version = '2.4.0'
 
+class Group {
+  constructor() {
+    this.name = ''
+    this.passes = 0
+    this.fails = 0
+    this.id = ''
+    this.hasChecks = false
+    this.groups = []
+  }
+}
 //
 // Main function should be imported and wrapped with the function handleSummary
 //
@@ -65,10 +75,17 @@ export function htmlReport(data, opts = {}) {
 
   let checks = []
   for (const group of data.root_group.groups) {
-    checks = getChecks(group)
+    checks = checks.concat(getChecks(group))
   }
-
+  let groups = []
+  for (const group of data.root_group.groups) {
+    groups = checks.concat(getGroups(group))
+  }
+  for (const group of groups) {
+    console.log(group)
+  }
   let { passes, fails } = countChecks(checks)
+
   checkFailures += fails
   checkPasses += passes
 
@@ -113,6 +130,7 @@ export function htmlReport(data, opts = {}) {
     checkPasses,
     version,
     checks,
+    groups,
   })
 
   // Return HTML string needs wrapping in a handleSummary result object
@@ -133,19 +151,44 @@ function countChecks(checks) {
   return { passes, fails }
 }
 
+function getGroups(data) {
+  let groups = []
+  if (data.checks.length == 0) {
+    for (const group of data.groups) {
+      const newGroup = new Group()
+      newGroup.name = group.name
+      newGroup.id = group.id
+      newGroup.groups = getGroups(group)
+    }
+  } else {
+    for (const check of data.checks) {
+      const newGroup = new Group()
+      newGroup.name = check.name
+      newGroup.passes = check.passes
+      newGroup.fails = check.fails
+      groups.push(newGroup)
+    }
+  }
+  return groups
+}
+
 function getChecks(data) {
   let checks = []
   if (data.checks.length != 0) {
-    for (const check in data.checks) {
-      const n = {
+    for (const check of data.checks) {
+      const newGroup = new Group()
+      newGroup.name = check.name
+      newGroup.passes = check.passes
+      newGroup.fails = check.fails
+      const newCheck = {
         passes: check.passes,
         fails: check.fails,
-        name: 'checking response code was 200',
-        path: '::StoreSearch Functional Tests::Stores Boudary Functional Tests::PostStoresSearchByBoundary::checking response code was 200',
-        id: '8e31f266c828fb500d80c6edaff4fe2a',
-        paths: parsePath(data.checks[check].path),
+        name: check.name,
+        path: check.path,
+        id: check.id,
+        paths: parsePath(check.path),
       }
-      checks.push(n)
+      checks.push(newCheck)
     }
   } else {
     for (const group of data.groups) {
