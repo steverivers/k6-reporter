@@ -1,6 +1,7 @@
 //
 // Generate HTML report from K6 summary data
-// Ben Coleman, March 2021
+// Based on work by Ben Coleman, March 2021
+// Updated to be Rogers Digital West specific by Stephen Rivers
 //
 
 // Have to import ejs this way, nothing else works
@@ -24,8 +25,12 @@ class Result {
 export function htmlReport(data, opts = {}) {
   // Default options
   if (!opts.title) {
-    opts.title = new Date().toISOString().slice(0, 16).replace('T', ' ')
+    opts.title = new Date().toLocaleDateString('en-CA')
   }
+  if (!opts.reportDate) {
+    opts.reportDate = new Date().toLocaleDateString('en-CA')
+  }
+
   // eslint-disable-next-line
   if (!opts.hasOwnProperty('debug')) {
     opts.debug = false
@@ -62,13 +67,13 @@ export function htmlReport(data, opts = {}) {
   let results = []
 
   let allchecks = JSONPath({ path: '$..checks', json: data.root_group })
-  
+
   for (const checks of allchecks) {
     if (checks.length != 0) {
       let result = new Result()
-      let groupNames = checks[0].path.substring(2).split('::').slice(0,-1)
+      let groupNames = checks[0].path.substring(2).split('::').slice(0, -1)
       result.testSuite = groupNames[0]
-      result.name = checks[0].path.substring(2).split('::').slice(1,-1).join('::')
+      result.name = checks[0].path.substring(2).split('::').slice(1, -1).join('::')
 
       for (const check of checks) {
         result.checks.push(check)
@@ -76,7 +81,7 @@ export function htmlReport(data, opts = {}) {
       results.push(result)
     }
   }
-  console.log(results)
+
   let { passes, fails } = countChecks(checks)
 
   checkFailures += fails
@@ -115,6 +120,7 @@ export function htmlReport(data, opts = {}) {
   const html = ejs.render(template, {
     data,
     title: opts.title,
+    reportDate: opts.reportDate,
     standardMetrics,
     otherMetrics,
     thresholdFailures,
