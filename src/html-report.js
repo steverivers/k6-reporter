@@ -6,19 +6,18 @@
 // Have to import ejs this way, nothing else works
 import ejs from '../node_modules/ejs/ejs.min.js'
 import template from './template.ejs'
+import { JSONPath } from 'jsonpath-plus'
 
 const version = '2.4.0'
 
-class Group {
+class Result {
   constructor() {
+    this.testSuite = ''
     this.name = ''
-    this.passes = 0
-    this.fails = 0
-    this.id = ''
-    this.hasChecks = false
-    this.groups = []
+    this.checks = []
   }
 }
+
 //
 // Main function should be imported and wrapped with the function handleSummary
 //
@@ -55,35 +54,29 @@ export function htmlReport(data, opts = {}) {
     }
   }
 
-  // Count the checks and those that have passed or failed
-  // NOTE. Nested groups are not checked!
   let checkFailures = 0
   let checkPasses = 0
-  // if (data.root_group.checks) {
-  //   let { passes, fails } = countChecks(data.root_group.checks)
-  //   checkFailures += fails
-  //   checkPasses += passes
-  // }
-
-  // for (let group of data.root_group.groups) {
-  //   if (group.checks) {
-  //     let { passes, fails } = countChecks(group.checks)
-  //     checkFailures += fails
-  //     checkPasses += passes
-  //   }
-  // }
 
   let checks = []
-  for (const group of data.root_group.groups) {
-    checks = checks.concat(getChecks(group))
+
+  let results = []
+
+  let allchecks = JSONPath({ path: '$..checks', json: data.root_group })
+  
+  for (const checks of allchecks) {
+    if (checks.length != 0) {
+      let result = new Result()
+      let groupNames = checks[0].path.substring(2).split('::').slice(0,-1)
+      result.testSuite = groupNames[0]
+      result.name = checks[0].path.substring(2).split('::').slice(1,-1).join('::')
+
+      for (const check of checks) {
+        result.checks.push(check)
+      }
+      results.push(result)
+    }
   }
-  let groups = []
-  for (const group of data.root_group.groups) {
-    groups = checks.concat(getGroups(group))
-  }
-  for (const group of groups) {
-    console.log(group)
-  }
+  console.log(results)
   let { passes, fails } = countChecks(checks)
 
   checkFailures += fails
@@ -130,7 +123,7 @@ export function htmlReport(data, opts = {}) {
     checkPasses,
     version,
     checks,
-    groups,
+    results,
   })
 
   // Return HTML string needs wrapping in a handleSummary result object
@@ -149,55 +142,4 @@ function countChecks(checks) {
     fails += parseInt(check.fails)
   }
   return { passes, fails }
-}
-
-function getGroups(data) {
-  let groups = []
-  if (data.checks.length == 0) {
-    for (const group of data.groups) {
-      const newGroup = new Group()
-      newGroup.name = group.name
-      newGroup.id = group.id
-      newGroup.groups = getGroups(group)
-    }
-  } else {
-    for (const check of data.checks) {
-      const newGroup = new Group()
-      newGroup.name = check.name
-      newGroup.passes = check.passes
-      newGroup.fails = check.fails
-      groups.push(newGroup)
-    }
-  }
-  return groups
-}
-
-function getChecks(data) {
-  let checks = []
-  if (data.checks.length != 0) {
-    for (const check of data.checks) {
-      const newGroup = new Group()
-      newGroup.name = check.name
-      newGroup.passes = check.passes
-      newGroup.fails = check.fails
-      const newCheck = {
-        passes: check.passes,
-        fails: check.fails,
-        name: check.name,
-        path: check.path,
-        id: check.id,
-        paths: parsePath(check.path),
-      }
-      checks.push(newCheck)
-    }
-  } else {
-    for (const group of data.groups) {
-      checks = checks.concat(getChecks(group))
-    }
-  }
-  return checks
-}
-
-function parsePath(data) {
-  return data.substring(2).split('::')
 }
